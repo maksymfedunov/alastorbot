@@ -33,7 +33,7 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable = create_async_engine(settings.database_url)
+    connectable = create_async_engine(settings.DATABASE_URL)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

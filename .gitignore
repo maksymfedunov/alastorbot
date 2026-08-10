@@ -1,16 +1,24 @@
-# Virtual environment
-.venv/
-
-# Python cache
-__pycache__/
-*.py[cod]
-
-# Environment variables
+# Секреты
 .env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# База данных
+*.db
+*.sqlite3
+
+# Векторный индекс и промежуточные данные RAG (генерируются, не хранятся в git)
+data/vector_store/*
+!data/vector_store/.gitkeep
+data/chunks.jsonl
 
 # IDE
 .vscode/
 .idea/
 
-# OS
-.DS_Store
+# Тесты и кэш
+.pytest_cache/

@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from google import genai
 
 from alastorbot.character.persona import SYSTEM_PROMPT
@@ -7,6 +10,10 @@ from alastorbot.rag.retriever import Retriever
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 retriever = Retriever()
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 2
+RETRY_DELAY_SECONDS = 1.5
 
 
 def build_lore_context(user_message: str) -> str:
@@ -23,7 +30,6 @@ def build_memory_context(user_facts: list[UserMemory]) -> str:
 
 
 def build_history_contents(history: list[Message]) -> list[dict]:
-    # У Gemini роль ассистента называется "model", а не "assistant"
     role_map = {"user": "user", "assistant": "model"}
     return [
         {"role": role_map[m.role], "parts": [{"text": m.content}]}
@@ -55,9 +61,20 @@ async def gemini_answer(
         {"role": "user", "parts": [{"text": user_message}]}
     ]
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=contents,
-        config={"system_instruction": full_system_prompt},
-    )
-    return response.text
+    last_error: Exception | None = None
+
+    for attempt in range(1, MAX_RETRIES + 2):  # 1 основная попытка + MAX_RETRIES повторов
+        try:
+            response = await client.aio.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=contents,
+                config={"system_instruction": full_system_prompt},
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Попытка {attempt} обращения к Gemini не удалась: {e}")
+            if attempt <= MAX_RETRIES:
+                await asyncio.sleep(RETRY_DELAY_SECONDS * attempt)
+
+    raise last_error

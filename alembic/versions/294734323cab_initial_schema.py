@@ -1,8 +1,8 @@
-"""create users, messages, user_memories
+"""initial schema
 
-Revision ID: 85b9d3b603ff
+Revision ID: 294734323cab
 Revises: 
-Create Date: 2026-08-04 19:41:53.746011
+Create Date: 2026-08-06 12:58:24.452876
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '85b9d3b603ff'
+revision: str = '294734323cab'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,6 +26,8 @@ def upgrade() -> None:
     sa.Column('telegram_id', sa.Integer(), nullable=False),
     sa.Column('username', sa.String(length=255), nullable=True),
     sa.Column('first_seen_at', sa.DateTime(), nullable=False),
+    sa.Column('messages_today', sa.Integer(), nullable=False),
+    sa.Column('limit_reset_date', sa.Date(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_telegram_id'), 'users', ['telegram_id'], unique=True)
