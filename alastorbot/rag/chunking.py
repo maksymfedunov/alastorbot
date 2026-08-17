@@ -19,15 +19,15 @@ class Chunk:
 
 
 def read_paragraphs(docx_path: Path) -> list[str]:
-    """Читает docx и возвращает непустые параграфы как список строк."""
+    """Reads a .docx file and returns non-empty paragraphs as a list of strings."""
     doc = Document(docx_path)
     return [p.text.strip() for p in doc.paragraphs if p.text.strip()]
 
 
 def chunk_paragraphs(paragraphs: list[str], book_name: str) -> list[Chunk]:
     """
-    Склеивает параграфы в чанки примерно по CHUNK_SIZE_WORDS слов,
-    с перехлёстом CHUNK_OVERLAP_WORDS между соседними чанками.
+    Groups paragraphs into chunks of roughly CHUNK_SIZE_WORDS words,
+    with an overlap of CHUNK_OVERLAP_WORDS between adjacent chunks.
     """
     chunks: list[Chunk] = []
     current_words: list[str] = []
@@ -51,9 +51,9 @@ def chunk_paragraphs(paragraphs: list[str], book_name: str) -> list[Chunk]:
 
 def process_all_books() -> list[Chunk]:
     """
-    Проходит по всем .docx в data/books/, разбивает каждую книгу
-    на чанки и сохраняет в data/chunks.jsonl — промежуточный файл,
-    который на этапе Embeddings превратится в векторы.
+    Walks through all .docx files in data/books/, splits each book
+    into chunks, and saves them to data/chunks.jsonl — an intermediate
+    file that becomes vectors in the Embeddings step.
     """
     all_chunks: list[Chunk] = []
 
@@ -62,7 +62,7 @@ def process_all_books() -> list[Chunk]:
         paragraphs = read_paragraphs(docx_path)
         book_chunks = chunk_paragraphs(paragraphs, book_name)
         all_chunks.extend(book_chunks)
-        print(f"{book_name}: {len(paragraphs)} параграфов -> {len(book_chunks)} чанков")
+        print(f"{book_name}: {len(paragraphs)} paragraphs -> {len(book_chunks)} chunks")
 
     with CHUNKS_PATH.open("w", encoding="utf-8") as f:
         for chunk in all_chunks:
@@ -72,7 +72,7 @@ def process_all_books() -> list[Chunk]:
                 "text": chunk.text,
             }, ensure_ascii=False) + "\n")
 
-    print(f"Всего чанков: {len(all_chunks)} -> сохранено в {CHUNKS_PATH}")
+    print(f"Total chunks: {len(all_chunks)} -> saved to {CHUNKS_PATH}")
     return all_chunks
 
 

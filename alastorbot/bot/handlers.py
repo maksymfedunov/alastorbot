@@ -8,6 +8,7 @@ from alastorbot.character.ai_client import gemini_answer
 from alastorbot.database.engine import async_session_factory
 from alastorbot.database.repositories import (
     DAILY_MESSAGE_LIMIT,
+    HISTORY_LIMIT,
     check_and_increment_limit,
     get_or_create_user,
     get_recent_messages,
@@ -20,21 +21,21 @@ from alastorbot.memory.memory_manager import extract_and_strip_memories, save_ne
 router = Router()
 logger = logging.getLogger(__name__)
 
-NON_TEXT_REPLY = "Слова, а не значки — вот что я понимаю. Скажи мне что-нибудь настоящее."
-
-MAX_MESSAGE_LENGTH = 2000
-TOO_LONG_REPLY = "Даже у моего терпения есть пределы — сократи мысль, и попробуем снова."
-
 FALLBACK_REPLIES = [
-    "...Хм. Похоже, связь между мирами сегодня барахлит — даже демонам иногда нужно перевести дух. Повтори через минуту?",
-    "Что-то мешает мне тебя расслышать — будто помехи на линии между Адом и твоим миром. Попробуй ещё раз.",
-    "Даже вечность иногда спотыкается. Дай мне момент и повтори вопрос.",
+    "...Hmm. Seems the connection between worlds is glitching today — even demons need to catch their breath sometimes. Try again in a minute?",
+    "Something's interfering with hearing you — like static on the line between Hell and your world. Try again.",
+    "Even eternity stumbles sometimes. Give me a moment and repeat the question.",
 ]
 
 LIMIT_REACHED_REPLY = (
-    f"Лимит сообщений на сегодня достигнут ({DAILY_MESSAGE_LIMIT}/{DAILY_MESSAGE_LIMIT}). "
-    "Возвращайся завтра."
+    f"Daily message limit reached ({DAILY_MESSAGE_LIMIT}/{DAILY_MESSAGE_LIMIT}). "
+    "Come back tomorrow."
 )
+
+NON_TEXT_REPLY = "Words, not little icons — that's what I understand. Tell me something real."
+
+MAX_MESSAGE_LENGTH = 2000
+TOO_LONG_REPLY = "Even my patience has limits — trim that thought down, and let's try again."
 
 
 @router.message(F.text)
@@ -42,6 +43,7 @@ async def handle_message(message: TgMessage) -> None:
     if len(message.text) > MAX_MESSAGE_LENGTH:
         await message.answer(TOO_LONG_REPLY)
         return
+
     async with async_session_factory() as session:
         user = await get_or_create_user(
             session,
@@ -54,9 +56,9 @@ async def handle_message(message: TgMessage) -> None:
             await message.answer(LIMIT_REACHED_REPLY)
             return
 
-        history = await get_recent_messages(session, user.id, limit=20)
+        history = await get_recent_messages(session, user.id, limit=HISTORY_LIMIT)
         user_facts = await get_user_memories(session, user.id)
-        
+
         await message.bot.send_chat_action(message.chat.id, "typing")
 
         try:
@@ -67,7 +69,7 @@ async def handle_message(message: TgMessage) -> None:
             )
             clean_reply, new_facts = extract_and_strip_memories(raw_reply)
         except Exception:
-            logger.exception("Ошибка при обращении к Gemini API")
+            logger.exception("Error while calling the Gemini API")
             await message.answer(random.choice(FALLBACK_REPLIES))
             return
 
@@ -77,9 +79,9 @@ async def handle_message(message: TgMessage) -> None:
         await trim_old_messages(session, user.id)
 
     await message.answer(clean_reply)
-    
-    
+
+
 @router.message()
 async def handle_non_text(message: TgMessage) -> None:
-    """Ловит всё, что не прошло фильтр F.text — стикеры, фото, голосовые и т.д."""
-    await message.answer(NON_TEXT_REPLY)    
+    """Catches anything that didn't match F.text — stickers, photos, voice messages, etc."""
+    await message.answer(NON_TEXT_REPLY)

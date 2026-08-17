@@ -27,9 +27,9 @@ async def save_message(session: AsyncSession, user_id: int, role: str, content: 
 
 async def trim_old_messages(session: AsyncSession, user_id: int, keep_last: int = HISTORY_LIMIT) -> None:
     """
-    Удаляет сообщения пользователя старше последних keep_last —
-    храним ровно столько, сколько реально читается get_recent_messages,
-    остальное никогда больше не используется.
+    Deletes messages older than the last keep_last for the given user —
+    we only keep as many as get_recent_messages actually reads, since
+    anything older is never used again.
     """
     result = await session.execute(
         select(Message.id)
@@ -52,11 +52,16 @@ async def get_recent_messages(session: AsyncSession, user_id: int, limit: int = 
         .limit(limit)
     )
     messages = list(result.scalars().all())
-    messages.reverse()
+    messages.reverse()  # back to chronological order
     return messages
 
 
 async def check_and_increment_limit(session: AsyncSession, user: User) -> bool:
+    """
+    Checks the user's daily message limit. Returns True if the message
+    is allowed (and immediately increments the counter), False if
+    today's limit has been reached.
+    """
     today = date.today()
 
     stored_reset_date = user.limit_reset_date

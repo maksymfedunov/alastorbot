@@ -14,32 +14,25 @@ MODEL_NAME = "intfloat/multilingual-e5-large"
 
 def build_index() -> None:
     """
-    Строит FAISS-индекс поверх уже готовых embeddings.npy
-    и сохраняет его на диск. Запускается один раз после
-    embeddings.py (и заново — при пересборе лора).
+    Builds a FAISS index on top of the already-computed embeddings.npy
+    and saves it to disk. Run once after embeddings.py (and again
+    whenever the lore is rebuilt).
     """
     embeddings = np.load(EMBEDDINGS_PATH).astype("float32")
 
-    # IndexFlatIP — точный поиск по скалярному произведению.
-    # Векторы уже нормализованы (normalize_embeddings=True на
-    # этапе Embeddings), поэтому скалярное произведение эквивалентно
-    # косинусной близости. "Flat" означает точный перебор без
-    # аппроксимации — для 1223 векторов это доли миллисекунды,
-    # приближённые индексы (IVF, HNSW) имели бы смысл на десятках
-    # тысяч+ векторов, но не здесь.
     index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
 
     faiss.write_index(index, str(INDEX_PATH))
-    print(f"Индекс построен: {index.ntotal} векторов -> {INDEX_PATH}")
+    print(f"Index built: {index.ntotal} vectors -> {INDEX_PATH}")
 
 
 class Retriever:
     """
-    Загружает готовый индекс и метаданные один раз при старте бота,
-    дальше отвечает на запросы `search()` без повторной загрузки —
-    это важно, чтобы каждое сообщение пользователя не тянуло
-    заново модель эмбеддингов и индекс с диска.
+    Loads the pre-built index and metadata once at startup, then
+    answers search() calls without reloading — this matters so that
+    every user message doesn't re-load the embeddings model and the
+    index from disk.
     """
 
     def __init__(self) -> None:
@@ -56,11 +49,10 @@ class Retriever:
 
     def search(self, query: str, top_k: int = 5) -> list[dict]:
         """
-        Возвращает top_k наиболее релевантных чанков для запроса —
-        список словарей с полями book, chunk_index, text.
+        Returns the top_k most relevant chunks for the query — a list
+        of dicts with book, chunk_index, and text fields.
         """
-        # Префикс "query: " — обязателен для e5, симметричен
-        # префиксу "passage: " на этапе индексации.
+       
         query_vector = self.model.encode(
             [f"query: {query}"],
             normalize_embeddings=True,

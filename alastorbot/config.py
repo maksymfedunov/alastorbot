@@ -1,3 +1,12 @@
+"""
+Application settings.
+
+All environment-dependent parameters (tokens, keys, paths) are read
+only here — via pydantic-settings from the .env file. The rest of the
+code imports the ready-made `settings` object instead of reading
+environment variables directly.
+"""
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

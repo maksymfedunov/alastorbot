@@ -9,9 +9,9 @@ MEMORY_PATTERN = re.compile(r"\[ЗАПОМНИТЬ:\s*(.+?)\]", re.DOTALL)
 
 def extract_and_strip_memories(raw_reply: str) -> tuple[str, list[str]]:
     """
-    Находит в ответе модели пометки [ЗАПОМНИТЬ: факт], вырезает их
-    из текста, который увидит пользователь, и возвращает извлечённые
-    факты отдельным списком.
+    Finds [ЗАПОМНИТЬ: fact] markers in the model's reply, strips them
+    out of the text the user will see, and returns the extracted
+    facts as a separate list.
     """
     facts = [match.strip() for match in MEMORY_PATTERN.findall(raw_reply)]
     clean_reply = MEMORY_PATTERN.sub("", raw_reply).strip()

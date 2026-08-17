@@ -1,3 +1,10 @@
+"""
+Application entry point.
+
+Sets up the Telegram bot with a webhook (instead of polling) so it
+can run on a hosting platform without keeping a terminal open.
+"""
+
 import logging
 
 from aiogram import Bot, Dispatcher

@@ -21,27 +21,27 @@ def load_chunks() -> list[dict]:
 
 def build_embeddings() -> None:
     """
-    Читает чанки из data/chunks.jsonl, превращает каждый в вектор
-    и сохраняет:
-        - embeddings.npy   — сами векторы (для FAISS на следующем этапе)
-        - metadata.jsonl   — какой вектор какому чанку соответствует
-                              (по индексу строки, тот же порядок)
+    Reads chunks from data/chunks.jsonl, turns each into a vector,
+    and saves:
+        - embeddings.npy   — the vectors themselves (for FAISS)
+        - metadata.jsonl   — which vector maps to which chunk
+                              (by line index, same order)
     """
     chunks = load_chunks()
-    print(f"Загружено чанков: {len(chunks)}")
+    print(f"Loaded chunks: {len(chunks)}")
 
     model = SentenceTransformer(MODEL_NAME)
 
-    # У модели e5 есть требование: тексты для индексации нужно
-    # префиксовать "passage: ", а поисковые запросы — "query: ".
-    # Без этого префикса качество поиска заметно хуже — так модель
-    # обучена различать, что индексируется, а что ищется.
+    # The e5 model requires indexed texts to be prefixed with
+    # "passage: " and search queries with "query: ". Skipping this
+    # prefix noticeably hurts search quality — it's how the model
+    # was trained to tell indexed content apart from queries.
     texts = [f"passage: {chunk['text']}" for chunk in chunks]
 
     embeddings = model.encode(
         texts,
         show_progress_bar=True,
-        normalize_embeddings=True,  # нормализация нужна для косинусной близости в FAISS
+        normalize_embeddings=True,  # required for cosine similarity in FAISS
     )
 
     EMBEDDINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -51,8 +51,8 @@ def build_embeddings() -> None:
         for chunk in chunks:
             f.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 
-    print(f"Сохранено: {EMBEDDINGS_PATH} (shape={embeddings.shape})")
-    print(f"Метаданные: {METADATA_PATH}")
+    print(f"Saved: {EMBEDDINGS_PATH} (shape={embeddings.shape})")
+    print(f"Metadata: {METADATA_PATH}")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 """
-Telegram-слой (aiogram).
+Telegram layer (aiogram).
 
-Здесь и только здесь проект знает о существовании Telegram.
-Этот модуль не должен обращаться к Claude API или к базе данных
-напрямую — вызывает функции из character/ и database/.
+This is the only place in the project that knows Telegram exists.
+This module must not call the Gemini API or the database directly —
+it delegates to functions from character/ and database/.
 """
 
 from alastorbot.bot.handlers import router

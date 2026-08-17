@@ -1,10 +1,10 @@
 """
-AlastorBot — Telegram-бот с AI-персонажем Аластера Роули.
+AlastorBot — a Telegram bot with an AI character, Alastor Rowley.
 
-Пакет разбит по зонам ответственности:
-    bot/        — приём и отправка сообщений в Telegram (aiogram)
-    database/   — модели и доступ к SQLite (SQLAlchemy)
-    character/  — логика персонажа и обращение к Claude API
-    rag/        — поиск по книгам (chunking, эмбеддинги, FAISS)
-    memory/     — память о конкретных пользователях
+The package is split by area of responsibility:
+    bot/        — receiving and sending Telegram messages (aiogram)
+    database/   — models and access to SQLite (SQLAlchemy)
+    character/  — character logic and calls to the Gemini API
+    rag/        — search over the book lore (chunking, embeddings, FAISS)
+    memory/     — memory about individual users
 """
