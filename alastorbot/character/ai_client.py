@@ -16,8 +16,8 @@ MAX_RETRIES = 2
 RETRY_DELAY_SECONDS = 1.5
 
 
-def build_lore_context(user_message: str) -> str:
-    chunks = retriever.search(user_message, top_k=4)
+async def build_lore_context(user_message: str) -> str:
+    chunks = await retriever.search(user_message, top_k=4)
     lore_parts = [f"[{chunk['book']}]\n{chunk['text']}" for chunk in chunks]
     return "\n\n---\n\n".join(lore_parts)
 
@@ -42,7 +42,7 @@ async def gemini_answer(
     history: list[Message],
     user_facts: list[UserMemory],
 ) -> str:
-    lore_context = build_lore_context(user_message)
+    lore_context = await build_lore_context(user_message)  
     memory_context = build_memory_context(user_facts)
 
     full_system_prompt = f"""{SYSTEM_PROMPT}
