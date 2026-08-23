@@ -5,6 +5,7 @@ from alastorbot.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     connect_args={"ssl": "require"},
+    pool_pre_ping=True,
 )
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 

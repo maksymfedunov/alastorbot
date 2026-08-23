@@ -4,17 +4,14 @@ import random
 from aiogram import F, Router
 from aiogram.types import Message as TgMessage
 
-from alastorbot.character.ai_client import gemini_answer
+from alastorbot.character.ai_client import gemini_answer, QuotaExceededError
+from alastorbot.bot.response_service import generate_and_deliver_reply
 from alastorbot.database.engine import async_session_factory
 from alastorbot.database.repositories import (
     DAILY_MESSAGE_LIMIT,
-    HISTORY_LIMIT,
     check_and_increment_limit,
+    enqueue_pending_message,
     get_or_create_user,
-    get_recent_messages,
-    get_user_memories,
-    save_message,
-    trim_old_messages,
 )
 from alastorbot.memory.memory_manager import extract_and_strip_memories, save_new_memories
 
@@ -22,20 +19,25 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 FALLBACK_REPLIES = [
-    "...Hmm. Seems the connection between worlds is glitching today — even demons need to catch their breath sometimes. Try again in a minute?",
-    "Something's interfering with hearing you — like static on the line between Hell and your world. Try again.",
-    "Even eternity stumbles sometimes. Give me a moment and repeat the question.",
+    "...Хм. Похоже, связь между мирами сегодня барахлит — даже демонам иногда нужно перевести дух. Повтори через минуту?",
+    "Что-то мешает мне тебя расслышать — будто помехи на линии между Адом и твоим миром. Попробуй ещё раз.",
+    "Даже вечность иногда спотыкается. Дай мне момент и повтори вопрос.",
 ]
 
 LIMIT_REACHED_REPLY = (
-    f"Daily message limit reached ({DAILY_MESSAGE_LIMIT}/{DAILY_MESSAGE_LIMIT}). "
-    "Come back tomorrow."
+    f"Лимит сообщений на сегодня достигнут ({DAILY_MESSAGE_LIMIT}/{DAILY_MESSAGE_LIMIT}). "
+    "Возвращайся завтра."
 )
 
-NON_TEXT_REPLY = "Words, not little icons — that's what I understand. Tell me something real."
+NON_TEXT_REPLY = "Слова, а не значки — вот что я понимаю. Скажи мне что-нибудь настоящее."
 
 MAX_MESSAGE_LENGTH = 2000
-TOO_LONG_REPLY = "Even my patience has limits — trim that thought down, and let's try again."
+TOO_LONG_REPLY = "Даже у моего терпения есть пределы — сократи мысль, и попробуем снова."
+
+QUOTA_QUEUED_REPLY = (
+    "Сегодня у меня иссякли силы говорить — слишком много желающих сделок сразу. "
+    "Твоё слово я услышал и не забуду: отвечу, как только смогу перевести дух."
+)
 
 
 @router.message(F.text)
@@ -44,41 +46,34 @@ async def handle_message(message: TgMessage) -> None:
         await message.answer(TOO_LONG_REPLY)
         return
 
-    async with async_session_factory() as session:
-        user = await get_or_create_user(
-            session,
-            telegram_id=message.from_user.id,
-            username=message.from_user.username,
-        )
-
-        allowed = await check_and_increment_limit(session, user)
-        if not allowed:
-            await message.answer(LIMIT_REACHED_REPLY)
-            return
-
-        history = await get_recent_messages(session, user.id, limit=HISTORY_LIMIT)
-        user_facts = await get_user_memories(session, user.id)
-
-        await message.bot.send_chat_action(message.chat.id, "typing")
-
-        try:
-            raw_reply = await gemini_answer(
-                user_message=message.text,
-                history=history,
-                user_facts=user_facts,
+    try:
+        async with async_session_factory() as session:
+            user = await get_or_create_user(
+                session,
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
             )
-            clean_reply, new_facts = extract_and_strip_memories(raw_reply)
-        except Exception:
-            logger.exception("Error while calling the Gemini API")
-            await message.answer(random.choice(FALLBACK_REPLIES))
-            return
 
-        await save_message(session, user.id, role="user", content=message.text)
-        await save_message(session, user.id, role="assistant", content=clean_reply)
-        await save_new_memories(session, user.id, new_facts)
-        await trim_old_messages(session, user.id)
+            allowed = await check_and_increment_limit(session, user)
+            if not allowed:
+                await message.answer(LIMIT_REACHED_REPLY)
+                return
 
-    await message.answer(clean_reply)
+            await message.bot.send_chat_action(message.chat.id, "typing")
+
+            try:
+                await generate_and_deliver_reply(
+                    session, message.bot, user, message.chat.id, message.text
+                )
+            except QuotaExceededError:
+                await enqueue_pending_message(session, user.id, message.chat.id, message.text)
+                await message.answer(QUOTA_QUEUED_REPLY)
+            except Exception:
+                logger.exception("Error while calling the Gemini API")
+                await message.answer(random.choice(FALLBACK_REPLIES))
+    except Exception:
+        logger.exception("Unexpected error while handling message")
+        await message.answer(random.choice(FALLBACK_REPLIES))
 
 
 @router.message()

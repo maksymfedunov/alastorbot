@@ -37,12 +37,18 @@ def build_history_contents(history: list[Message]) -> list[dict]:
     ]
 
 
+class QuotaExceededError(Exception):
+    """Raised specifically when Gemini's request quota is exhausted —
+    as opposed to other transient errors, this won't resolve with a
+    few retries; the message needs to wait for the quota to reset."""
+
+
 async def gemini_answer(
     user_message: str,
     history: list[Message],
     user_facts: list[UserMemory],
 ) -> str:
-    lore_context = await build_lore_context(user_message)  
+    lore_context = await build_lore_context(user_message)
     memory_context = build_memory_context(user_facts)
 
     full_system_prompt = f"""{SYSTEM_PROMPT}
@@ -63,7 +69,7 @@ async def gemini_answer(
 
     last_error: Exception | None = None
 
-    for attempt in range(1, MAX_RETRIES + 2):  # 1 основная попытка + MAX_RETRIES повторов
+    for attempt in range(1, MAX_RETRIES + 2):
         try:
             response = await client.aio.models.generate_content(
                 model="gemini-3.6-flash",
@@ -73,7 +79,11 @@ async def gemini_answer(
             return response.text
         except Exception as e:
             last_error = e
-            logger.warning(f"Попытка {attempt} обращения к Gemini не удалась: {e}")
+            # Quota errors won't fix themselves by retrying a few
+            # seconds later — fail fast instead of wasting retries.
+            if "RESOURCE_EXHAUSTED" in str(e):
+                raise QuotaExceededError(str(e)) from e
+            logger.warning(f"Gemini call attempt {attempt} failed: {e}")
             if attempt <= MAX_RETRIES:
                 await asyncio.sleep(RETRY_DELAY_SECONDS * attempt)
 

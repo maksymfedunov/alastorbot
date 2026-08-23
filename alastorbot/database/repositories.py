@@ -3,7 +3,7 @@ from datetime import date, datetime
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alastorbot.database.models import Message, User, UserMemory
+from alastorbot.database.models import Message, User, UserMemory, PendingMessage
 
 DAILY_MESSAGE_LIMIT = 10
 HISTORY_LIMIT = 20
@@ -89,3 +89,24 @@ async def save_memory_fact(session: AsyncSession, user_id: int, fact: str) -> No
 async def get_user_memories(session: AsyncSession, user_id: int) -> list[UserMemory]:
     result = await session.execute(select(UserMemory).where(UserMemory.user_id == user_id))
     return list(result.scalars().all())
+
+
+async def enqueue_pending_message(session: AsyncSession, user_id: int, chat_id: int, content: str) -> None:
+    session.add(PendingMessage(user_id=user_id, chat_id=chat_id, content=content))
+    await session.commit()
+
+
+async def get_oldest_pending_messages(session: AsyncSession, limit: int = 5) -> list[PendingMessage]:
+    """
+    Returns the oldest queued messages first (FIFO) — so whoever
+    waited longest gets answered first once quota is available again.
+    """
+    result = await session.execute(
+        select(PendingMessage).order_by(PendingMessage.created_at.asc()).limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def delete_pending_message(session: AsyncSession, pending_id: int) -> None:
+    await session.execute(delete(PendingMessage).where(PendingMessage.id == pending_id))
+    await session.commit()
