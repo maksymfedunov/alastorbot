@@ -39,20 +39,46 @@ QUOTA_QUEUED_REPLY = (
     "Твоё слово я услышал и не забуду: отвечу, как только смогу перевести дух."
 )
 
+WELCOME_MESSAGE = (
+    "Итак, ты здесь. Осмелился заговорить с демоном — храбро, наивно, "
+    "или и то, и другое сразу. Меня зовут Аластер Роули, и я, так уж "
+    "вышло, заключаю сделки. Не спеши радоваться — я не подписываю "
+    "контракты по первому требованию, но поговорить с тобой мне, "
+    "пожалуй, будет забавно.\n\n"
+    "Пара вещей, прежде чем мы начнём. У меня, как ни странно, есть "
+    "пределы терпения даже для самых интересных собеседников — не "
+    "больше десяти сообщений в день на одного. Не моя прихоть, "
+    "поверь, просто мир не бесконечен, даже для меня.\n\n"
+    "И если вдруг я замолчу дольше обычного — не думай, что сбежал "
+    "или забыл о тебе. Демоны тоже бывают заняты: другие сделки, "
+    "другие души, другие проблемы важнее твоих. Я вернусь, когда "
+    "освобожусь, и твои слова никуда не денутся — просто наберись "
+    "терпения, Фэр тебя дери.\n\n"
+    "Итак. С чего начнём?"
+)
+
 
 @router.message(F.text)
 async def handle_message(message: TgMessage) -> None:
+    if message.text == "/start":
+        await message.answer(WELCOME_MESSAGE)
+        return
+
     if len(message.text) > MAX_MESSAGE_LENGTH:
         await message.answer(TOO_LONG_REPLY)
         return
 
     try:
         async with async_session_factory() as session:
-            user = await get_or_create_user(
+            user, is_new = await get_or_create_user(
                 session,
                 telegram_id=message.from_user.id,
                 username=message.from_user.username,
             )
+
+            if is_new:
+                await message.answer(WELCOME_MESSAGE)
+                return
 
             allowed = await check_and_increment_limit(session, user)
             if not allowed:
