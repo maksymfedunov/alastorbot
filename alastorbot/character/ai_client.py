@@ -72,7 +72,7 @@ async def gemini_answer(
     for attempt in range(1, MAX_RETRIES + 2):
         try:
             response = await client.aio.models.generate_content(
-                model="Gemini 3.1 Flash Lite",
+                model="gemini-3.1-flash-lite",
                 contents=contents,
                 config={"system_instruction": full_system_prompt},
             )
